@@ -48,6 +48,7 @@ impl Default for SessionLimits {
 }
 
 /// Outbound message: a frame batch or a stream's raw bytes for the backend.
+#[derive(Clone)]
 pub enum SessionMsg {
     Frame(Frame),
     StreamData { id: u32, data: Vec<u8> },

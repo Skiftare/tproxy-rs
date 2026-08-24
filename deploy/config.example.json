@@ -1,0 +1,9 @@
+{
+  "public_hostname": "__TPROXY_HOSTNAME__",
+  "listen": "0.0.0.0:8091",
+  "admin_listen": "127.0.0.1:8092",
+  "public_dir": "/app/site",
+  "mtproxy_addr": "mtproxy:2398",
+  "secret_hex": "__TPROXY_SECRET__",
+  "carrier_mode": "websocket"
+}

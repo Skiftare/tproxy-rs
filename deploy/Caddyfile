@@ -1,0 +1,13 @@
+# Caddyfile: маскировка-сайт + прокси на tproxy-rs.
+# Терминация TLS автоматически (Let's Encrypt) для $CADDY_HOSTNAME.
+# Все пути идут на tproxy-rs (он сам отдаёт site на обычных путях и bridge по ?bridge=).
+
+{$CADDY_HOSTNAME} {
+    reverse_proxy tproxy-rs:8091
+    # статика (необязательно, если хочется отдавать сайт напрямую из Caddy)
+    # root * /srv/site
+    # handle /assets/* {
+    #     root * /srv/site
+    #     file_server
+    # }
+}

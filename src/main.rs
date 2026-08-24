@@ -22,6 +22,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
     let raw = std::fs::read_to_string(&cli.config)?;
     let mut cfg: Config = serde_json::from_str(&raw)?;
+    cfg.apply_env();
     if let Some(port) = cli.port {
         cfg.listen = format!("127.0.0.1:{port}");
     }

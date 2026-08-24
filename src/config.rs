@@ -77,6 +77,19 @@ impl Config {
         Ok(bytes)
     }
 }
+impl Config {
+    /// Override config fields from environment variables (deploy-friendly).
+    /// Priority: env > config.json > defaults.
+    pub fn apply_env(&mut self) {
+        if let Ok(v) = std::env::var("TPROXY_SECRET") { if !v.is_empty() { self.secret_hex = v; } }
+        if let Ok(v) = std::env::var("TPROXY_HOSTNAME") { if !v.is_empty() { self.public_hostname = v; } }
+        if let Ok(v) = std::env::var("TPROXY_LISTEN") { if !v.is_empty() { self.listen = v; } }
+        if let Ok(v) = std::env::var("TPROXY_CARRIER") { if !v.is_empty() { self.carrier_mode = v; } }
+        if let Ok(v) = std::env::var("TPROXY_MPROXY") { if !v.is_empty() { self.mtproxy_addr = v; } }
+        if let Ok(v) = std::env::var("TPROXY_SITE_DIR") { if !v.is_empty() { self.public_dir = PathBuf::from(v); } }
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -92,4 +105,6 @@ mod tests {
         c.secret_hex = "zz".into();
         assert!(c.secret_bytes().is_err());
     }
+
+
 }

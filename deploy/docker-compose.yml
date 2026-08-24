@@ -1,0 +1,49 @@
+# tproxy-rs + MTProto-proxy — 1-командный деплой.
+# Caddy сам выпускает TLS для TPROXY_HOSTNAME (из .env) и проксирует на tproxy-rs.
+# Маскировка: TPROXY_SITE_DIR-папка отдаётся на всех путях, кроме ?bridge=.
+services:
+  tproxy-rs:
+    image: debian:bookworm-slim
+    container_name: tproxy-rs
+    restart: unless-stopped
+    command: ["/app/tproxy-rs", "-c", "/app/config.json"]
+    environment:
+      TPROXY_HOSTNAME: "${TPROXY_HOSTNAME}"
+      TPROXY_SECRET: "${TPROXY_SECRET}"
+      TPROXY_SITE_DIR: /app/public
+    volumes:
+      - ../target2/release/tproxy-rs:/app/tproxy-rs:ro
+      - ../deploy/config.json:/app/config.json:ro
+      - ./site:/app/public:ro
+
+  mtproxy:
+    image: seriyps/mtproto-proxy
+    container_name: mtproxy
+    restart: unless-stopped
+    expose:
+      - "2398"
+    # секрет из окружения (deploy.sh передаёт через env? нет — секрет в config mtproxy;
+    # seriyps принимает командой; берём из env подставляя)
+    environment:
+      MTP_PORT: 2398
+      MTP_SECRET: "${TPROXY_SECRET}"
+      MTP_TAG: "${TPROXY_TAG:-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}"
+
+  caddy:
+    image: caddy:2
+    container_name: caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      CADDY_HOSTNAME: "${TPROXY_HOSTNAME}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./site:/srv/site:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:
