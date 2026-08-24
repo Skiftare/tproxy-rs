@@ -1,0 +1,32 @@
+[package]
+name = "tproxy-rs"
+version = "0.1.0"
+edition = "2021"
+description = "Rust implementation of the Telegram WEB proxy server (protocol v1, clean-room by PROTOCOL.md)"
+license = "MIT"
+repository = "https://github.com/sk1ft/tproxy-rs"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+axum = "0.7"
+tower = "0.5"
+tower-http = { version = "0.5", features = ["fs", "trace"] }
+tokio-tungstenite = "0.23"
+futures-util = "0.3"
+sha2 = "0.10"
+hmac = "0.12"
+base64 = "0.22"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+clap = { version = "4", features = ["derive"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+thiserror = "1"
+hex = "0.4"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full", "test-util"] }
+
+[profile.release]
+lto = true
+strip = true
