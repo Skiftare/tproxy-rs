@@ -18,7 +18,7 @@ use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 
-use crate::frame::{Frame, TYPE_BYE, TYPE_CLOSE, TYPE_DATA, TYPE_HELLO, TYPE_OPEN, TYPE_PING, TYPE_WELCOME, TYPE_WINDOW};
+use crate::frame::{Frame, TYPE_BYE, TYPE_CLOSE, TYPE_DATA, TYPE_HELLO, TYPE_OPEN, TYPE_PING, TYPE_PONG, TYPE_WELCOME, TYPE_WINDOW};
 
 /// A logical stream bound to one backend TCP connection.
 struct Stream {
@@ -48,7 +48,7 @@ impl Default for SessionLimits {
 }
 
 /// Outbound message: a frame batch or a stream's raw bytes for the backend.
-enum SessionMsg {
+pub enum SessionMsg {
     Frame(Frame),
     StreamData { id: u32, data: Vec<u8> },
     StreamClose { id: u32 },

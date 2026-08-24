@@ -8,7 +8,7 @@ repository = "https://github.com/sk1ft/tproxy-rs"
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
-axum = "0.7"
+axum = { version = "0.7", features = ["ws"] }
 tower = "0.5"
 tower-http = { version = "0.5", features = ["fs", "trace"] }
 tokio-tungstenite = "0.23"
