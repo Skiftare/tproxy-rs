@@ -53,6 +53,17 @@ pub fn verify_bridge_param(host: &Hostname, secret_bytes: &[u8], provided: &str)
     diff == 0
 }
 
+/// Verify a bridge capability against ANY of several secrets (multi-secret).
+/// Returns true if at least one configured secret yields the capability.
+pub fn verify_bridge_param_any(host: &Hostname, secrets: &[Vec<u8>], provided: &str) -> bool {
+    for s in secrets {
+        if verify_bridge_param(host, s, provided) {
+            return true;
+        }
+    }
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

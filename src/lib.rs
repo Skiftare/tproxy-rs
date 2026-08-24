@@ -12,7 +12,7 @@ pub mod relay;
 pub mod server;
 pub mod session;
 
-pub use bridge::{bridge_capability, verify_bridge_param, Hostname};
+pub use bridge::{bridge_capability, verify_bridge_param, verify_bridge_param_any, Hostname};
 pub use config::Config;
 pub use frame::{decode_batch, Frame, FrameError, TYPE_BYE, TYPE_CLOSE, TYPE_DATA, TYPE_HELLO, TYPE_OPEN, TYPE_PING, TYPE_PONG, TYPE_WELCOME, TYPE_WINDOW};
 pub use session::{run_session_loop, Session, SessionLimits, SessionMsg};

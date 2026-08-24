@@ -12,8 +12,8 @@ services:
       TPROXY_SECRET: "${TPROXY_SECRET}"
       TPROXY_SITE_DIR: /app/public
     volumes:
-      - ../target2/release/tproxy-rs:/app/tproxy-rs:ro
-      - ../deploy/config.json:/app/config.json:ro
+      - ./tproxy-rs-bin:/app/tproxy-rs:ro
+      - ./config.json:/app/config.json:ro
       - ./site:/app/public:ro
 
   mtproxy:
