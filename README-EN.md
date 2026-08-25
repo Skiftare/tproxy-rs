@@ -11,7 +11,7 @@ public spec, no Go code copied. MIT.
 What it does:
 - **bridge** — HMAC-SHA256 capability per spec (`tdesktop-web-proxy-bridge-v1\n<host>`);
 - **frame codec** — OPEN/DATA/CLOSE/WINDOW/HELLO/WELCOME;
-- **carriers** — `websocket`, `https`, `https-lanes`, `websocket-lanes`;
+- **carriers** — `websocket` (works), `https-lanes` (**NOT working in the current Rust implementation**), `https`, `websocket-lanes` (experimental);
 - **multi-host** — one relay process serves N sites, each with its own keys and mask;
 - **key isolation** — a key minted for site A does not work on site B (capability hashes the hostname);
 - **burn** — the "address burning" generator: YAML becomes 1 relay + 1 dumb MTProxy + N masks + keys.zip.
@@ -109,7 +109,7 @@ For one proxy without a fleet:
 ```bash
 ./deploy.sh --hostname my-proxy.example.com                          # secret auto-generated
 ./deploy.sh --hostname my-proxy.example.com --secret 000102030405060708090a0b0c0d0e0f
-./deploy.sh --hostname my-proxy.example.com --carrier https-lanes --secret S1 --secret S2
+./deploy.sh --hostname my-proxy.example.com --carrier websocket --secret S1 --secret S2
 ```
 
 It generates the config, compose (tproxy-rs + mtproxy + Caddy with auto-TLS),
@@ -119,16 +119,16 @@ brings it up, and prints Host + secrets.
 
 ## Cloudflare and similar CDNs — read this first
 
-- **WebSocket and long-poll (all carriers except `https-lanes`) break behind a CF proxy.**
-  Cloudflare buffers the upgrade/long-lived connections, so the client sees
-  "endless reconnect" even though TCP/TLS reach the origin. Keep the proxy domain
-  **DNS-only (grey cloud)**.
-- **`https-lanes`** (short POST requests instead of one long channel) survives CF
-  much better — it is the only carrier worth trying behind CF.
+- **WebSocket breaks behind a CF proxy.** Cloudflare buffers the upgrade/long-lived
+  connections, so the client sees "endless reconnect" even though TCP/TLS reach the
+  origin. The only reliable setup is **DNS-only (grey cloud)** for the proxy domain.
+- `https-lanes` is advertised in the spec as a CF workaround, but **it is NOT
+  implemented in the current relay** (see "What it does"). Don't rely on it; if you
+  need CF bypass, improve the core.
 - If the proxy domain shares a hostname with the site, CF proxies that hostname
   entirely — put the site and the proxy on separate subdomains.
 - DPI blocking (ISPs, etc.) chokes long WS connections even without CF —
-  for resilience prefer `https-lanes` and/or fresh domains.
+  for resilience use fresh domains and/or rotate keys often.
 
 ## Keys and entry
 
