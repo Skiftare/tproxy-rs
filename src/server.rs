@@ -13,15 +13,14 @@ use axum::extract::{Query, State};
 use axum::http::{header, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post, delete};
-use axum::{Json, Router};
-use serde::{Deserialize, Serialize};
+use axum::Router;
+use serde::Deserialize;
 use futures_util::{SinkExt, StreamExt};
 use tokio::sync::{broadcast, mpsc, Mutex};
 
-use crate::bridge::{verify_bridge_param, verify_bridge_param_any, Hostname};
 use sha2::{Digest, Sha256};
 use crate::config::Config;
-use crate::frame::{self, Frame, TYPE_BYE, TYPE_CLOSE, TYPE_DATA, TYPE_HELLO, TYPE_PING, TYPE_WELCOME, TYPE_WINDOW};
+use crate::frame::{self, Frame, TYPE_CLOSE, TYPE_DATA, TYPE_HELLO, TYPE_WELCOME};
 use crate::session::{run_session_loop, SessionLimits, SessionMsg};
 
 // ---- shared session state ----
@@ -63,6 +62,7 @@ struct RootQuery {
 
 // ---- session endpoint (HELLO -> WELCOME, issues bearer) ----
 #[derive(Deserialize)]
+#[allow(dead_code)]
 struct SessionReq {}
 
 
@@ -278,10 +278,10 @@ async fn ws_carrier(
 }
 
 async fn handle_ws(socket: axum::extract::ws::WebSocket, st: AppState, backend: String) {
-    use axum::extract::ws::{Message, WebSocket};
+    use axum::extract::ws::Message;
     let (tx, rx) = socket.split();
-    let (session_tx, mut session_rx) = mpsc::channel::<SessionMsg>(256);
-    let (frame_tx, mut frame_rx) = mpsc::channel::<Frame>(256);
+    let (session_tx, session_rx) = mpsc::channel::<SessionMsg>(256);
+    let (frame_tx, frame_rx) = mpsc::channel::<Frame>(256);
     let session_id = st.next_id.fetch_add(1, Ordering::Relaxed);
     let limits = SessionLimits::default();
 

@@ -18,9 +18,10 @@ use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 
-use crate::frame::{Frame, TYPE_BYE, TYPE_CLOSE, TYPE_DATA, TYPE_HELLO, TYPE_OPEN, TYPE_PING, TYPE_PONG, TYPE_WELCOME, TYPE_WINDOW};
+use crate::frame::{Frame, TYPE_BYE, TYPE_CLOSE, TYPE_DATA, TYPE_HELLO, TYPE_OPEN, TYPE_PONG, TYPE_WELCOME, TYPE_WINDOW};
 
 /// A logical stream bound to one backend TCP connection.
+#[allow(dead_code)]
 struct Stream {
     id: u32,
     tx: OwnedWriteHalf,

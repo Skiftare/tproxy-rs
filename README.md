@@ -1,5 +1,9 @@
 # tproxy-rs
 
+[![CI build](https://github.com/Skiftare/tproxy-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/Skiftare/tproxy-rs/actions/workflows/ci.yml)
+[![tests](https://img.shields.io/github/actions/workflow/status/Skiftare/tproxy-rs/ci.yml?branch=main&label=tests)](https://github.com/Skiftare/tproxy-rs/actions/workflows/ci.yml)
+[![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Skiftare/tproxy-rs/main/badges/coverage.json&style=flat)](https://github.com/Skiftare/tproxy-rs/actions/workflows/ci.yml)
+
 Rust-реализация **WEB proxy сервера для Telegram** (протокол v1 по PROTOCOL.md
 из telegramdesktop/tproxy-server). Clean-room: по публичной спеке, без копирования Go-кода. MIT.
 
@@ -9,11 +13,11 @@ Rust-реализация **WEB proxy сервера для Telegram** (прот
 - **карьеры** — `websocket`, `https`, `https-lanes`, `websocket-lanes`;
 - **мульти-хост** — один процесс релея обслуживает N сайтов, у каждого свои ключи и своя маска;
 - **изоляция ключей** — ключ сайта A не работает на сайте B (capability хэширует hostname);
-- **burn** — генератор «сжигания адресов»: YAML → 1 релей + 1 dumb-MTProxy + N масок + keys.zip.
+- **burn** — генератор «сжигания адресов»: YAML превращается в 1 релей + 1 dumb-MTProxy + N масок + keys.zip.
 
 ---
 
-## 🏭 Главный инструмент: `burn` (штамповка флота)
+## Главный инструмент: `burn` (штамповка флота)
 
 Один YAML-файл описывает сколько угодно сайтов и сколько угодно ключей на каждом.
 Из него `burn` рендерит **весь** деплой:
@@ -37,11 +41,11 @@ tproxy:
 
 sites:
   - domain: site-a.example.com
-    keys: 1447                # число → сгенерить 1447 ключей (CSPRNG)
+    keys: 1447                # число: сгенерить 1447 ключей (CSPRNG)
 
   - domain: site-b.example.com
     keys: [000102030405060708090a0b0c0d0e0f,
-           112233445566778899aabbccddeeff00]   # список → использовать как есть
+           112233445566778899aabbccddeeff00]   # список: использовать как есть
 
   - domain: site-c.example.net
     keys: 1
@@ -78,14 +82,14 @@ services:
     entrypoint: ["/opt/mtp_proxy/bin/mtp_proxy", "foreground"]
     volumes:
       - ./burn-out/mtproxy.sys.config:/opt/mtp_proxy/releases/0.1.0/sys.config:ro
-    # ВАЖНО: без секции ports: — порты доступны только внутри docker-сети
+    # ВАЖНО: без секции ports: - порты доступны только внутри docker-сети
 ```
 
 ### Как работает один dumb-MTProxy на N ключей
 
 Официальный CLI-старт (`-p -s`) принимает **один** секрет. Но сам MTProxy умеет
 список: `sys.config` содержит `{mtproto_proxy, [{ports, [#{port => P, secret => <<"S">>}, ...]}]}`.
-`burn` генерит этот `sys.config` со всеми ключами, и он **монтируется поверх**
+`burn` генерирует этот `sys.config` со всеми ключами, и он **монтируется поверх**
 `/opt/mtp_proxy/releases/0.1.0/sys.config` — один процесс, N портов, все в приватной сети.
 
 ### Изоляция ключей
@@ -97,7 +101,7 @@ services:
 
 ---
 
-## 🚀 Простой деплой одного сайта (`deploy.sh`)
+## Простой деплой одного сайта (`deploy.sh`)
 
 Для одного прокси без флота:
 
@@ -112,23 +116,23 @@ Host + секреты.
 
 ---
 
-## ⚠️ Cloudflare и подобные CDN — читать обязательно
+## Cloudflare и подобные CDN — читать обязательно
 
 - **WebSocket и long-poll (все карьеры, кроме `https-lanes`) ломаются за CF-проксированием.**
-  Cloudflare буферизует апгрейд/длинные соединения → клиент видит «вечный реконнект»,
-  хотя TCP/TLS доходят. Как минимум держи прокси-домен **DNS-only (серое облако)**.
+  Cloudflare буферизует апгрейд/длинные соединения, из-за чего клиент видит «вечный
+  реконнект», хотя TCP/TLS доходят. Держи прокси-домен **DNS-only (серое облако)**.
 - **`https-lanes`** (короткие POST-запросы вместо одного долгого канала) переживает CF
   заметно лучше — это единственный карьер, который можно пробовать за CF.
-- Если прокси-домен совмещён с сайтом на одном hostname — CF-прокси этот домен целиком,
-  значит и сайт, и прокси. Разводи на разные поддомены.
-- DPI-блокировки (российские провыдера и т.п.) душат долгие WS-соединения даже без CF —
+- Если прокси-домен совмещён с сайтом на одном hostname, CF-проксирует этот домен целиком —
+  разводи сайт и прокси на разные поддомены.
+- DPI-блокировки (провайдеры и т.п.) душат долгие WS-соединения даже без CF —
   для устойчивости выбирай `https-lanes` и/или свежие домены.
 
 ## Ключи и вход
 
 - **Публичный вход** — один: `https://<hostname>` (это и есть «порт»).
 - **Ключей может быть сколько угодно**: каждый ключ — отдельный человек/круг.
-- В Telegram: Настройки → Прокси → + → Web Proxy → Host + Secret.
+- В Telegram: Настройки, Прокси, +, Web Proxy, Host + Secret.
 
 ## Сборка
 
@@ -143,12 +147,12 @@ cargo test        # 20+ тестов: кодек, изоляция ключей,
 
 ```
 src/
-  server.rs    — axum: /api/v1/{session,up,down,ws}, bridge, статика по Host
-  config.rs    — Config: hosts[] (hostname + public_dir + secrets), capability_site
-  session.rs   — frame-движок, потоки к dumb-MTProxy
-  frame.rs     — кодек фреймов
-  bridge.rs    — HMAC-capability, Hostname
-  bin/burn.rs  — генератор флота из YAML (config + sys.config + nginx + masks + zip)
+  server.rs    - axum: /api/v1/{session,up,down,ws}, bridge, статика по Host
+  config.rs    - Config: hosts[] (hostname + public_dir + secrets), capability_site
+  session.rs   - frame-движок, потоки к dumb-MTProxy
+  frame.rs     - кодек фреймов
+  bridge.rs    - HMAC-capability, Hostname
+  bin/burn.rs  - генератор флота из YAML (config + sys.config + nginx + masks + zip)
 ```
 
 Ядро (config/server/session) — единственное место с протокольной логикой.

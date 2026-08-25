@@ -23,7 +23,7 @@ use std::path::{Path, PathBuf};
 
 use rand::rngs::OsRng;
 use rand::RngCore;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 /// One logical proxy site in the mass file.
 #[derive(Debug, Clone, Deserialize, PartialEq)]

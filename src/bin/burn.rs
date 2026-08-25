@@ -61,7 +61,10 @@ struct TproxySpec {
     #[serde(default = "d_mtproxy_container")] mtproxy_container: String,
     #[serde(default = "d_base_port")] mtproxy_base_port: u16,
     #[serde(default = "d_public_root")] public_root: String,
-    #[serde(default = "d_site_suffix")] site_suffix: String,
+    /// Reserved for future per-site subdomain suffix handling.
+    #[serde(default = "d_site_suffix")]
+    #[allow(dead_code)]
+    site_suffix: String,
     /// Name of the relay container (used in nginx upstream default).
     #[serde(default = "d_relay_container")] nginx_upstream: String,
 }
@@ -243,7 +246,7 @@ fn gen(yaml_path: &Path, out: &Path, dry: bool) -> Result<(), Box<dyn std::error
     //    N портов, все в приватной сети (наружу не публикуются).
     let mut sys_config = String::from("%% -*- mode: erlang -*-\n[\n {mtproto_proxy,\n  [\n   {ports,\n    [\n");
     let mut first = true;
-    for (domain, p, secs) in &site_rows {
+    for (_domain, p, secs) in &site_rows {
         for (i, sec) in secs.iter().enumerate() {
             if !first { sys_config.push_str(",\n"); }
             first = false;
