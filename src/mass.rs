@@ -84,8 +84,8 @@ pub struct MassPlan {
 impl MassConfig {
     pub fn load(path: &Path) -> Result<Self, String> {
         let raw = fs::read_to_string(path).map_err(|e| format!("read {}: {e}", path.display()))?;
-        let cfg: Self =
-            serde_yaml::from_str(&raw).map_err(|e| format!("parse YAML {}: {e}", path.display()))?;
+        let cfg: Self = serde_yaml::from_str(&raw)
+            .map_err(|e| format!("parse YAML {}: {e}", path.display()))?;
         if cfg.sites.is_empty() {
             return Err("mass YAML: no 'sites:' entries".into());
         }
@@ -139,7 +139,11 @@ impl MassConfig {
             }
             let mask = site.mask.as_ref().map(|m| {
                 let p = PathBuf::from(m);
-                if p.is_absolute() { p } else { base_dir.join(&p) }
+                if p.is_absolute() {
+                    p
+                } else {
+                    base_dir.join(&p)
+                }
             });
             // Assign one backend per secret, each on its own container/port.
             let mut backends: Vec<(String, String)> = Vec::with_capacity(secrets.len());
@@ -197,7 +201,8 @@ impl MassPlan {
         let secrets_path = out_dir.join("secrets.txt");
         {
             let mut f = fs::File::create(&secrets_path).map_err(|e| e.to_string())?;
-            f.write_all(secrets_file.as_bytes()).map_err(|e| e.to_string())?;
+            f.write_all(secrets_file.as_bytes())
+                .map_err(|e| e.to_string())?;
         }
         #[cfg(unix)]
         {
@@ -243,7 +248,12 @@ impl MassPlan {
             }
             // MTProto backend per secret (own port each).
             for (secret, addr) in &site.backends {
-                let port: usize = addr.split(':').last().unwrap_or("2398").parse().unwrap_or(2398);
+                let port: usize = addr
+                    .split(':')
+                    .next_back()
+                    .unwrap_or("2398")
+                    .parse()
+                    .unwrap_or(2398);
                 let cname = format!("mtproxy-{port}");
                 yaml.push_str(&format!(
                     "  {cname}:\n\
@@ -284,7 +294,10 @@ impl MassPlan {
             } else {
                 "tproxy-rs".into()
             };
-            cf.push_str(&format!("{} {{\n    reverse_proxy {}:8091\n}}\n\n", site.domain, relay_name));
+            cf.push_str(&format!(
+                "{} {{\n    reverse_proxy {}:8091\n}}\n\n",
+                site.domain, relay_name
+            ));
         }
         fs::write(out_dir.join("Caddyfile"), cf).map_err(|e| e.to_string())?;
         Ok(())
@@ -323,7 +336,13 @@ impl MassPlan {
 
 fn sanitize(s: &str) -> String {
     s.chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '.' { c } else { '_' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '.' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect()
 }
 
@@ -344,7 +363,7 @@ sites:
     carrier: https-lanes
 "#;
         let cfg: MassConfig = serde_yaml::from_str(yaml).unwrap();
-        assert_eq!(cfg.isolation, true);
+        assert!(cfg.isolation);
         assert_eq!(cfg.sites.len(), 2);
         assert!(matches!(cfg.sites[0].keys, KeySpec::List(_)));
         assert!(matches!(cfg.sites[1].keys, KeySpec::Count(3)));

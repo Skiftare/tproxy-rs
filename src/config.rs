@@ -125,7 +125,10 @@ impl Config {
     pub fn resolve_site(&self, host: &str) -> Option<Site> {
         let h = host.trim().to_lowercase();
         if !self.hosts.is_empty() {
-            self.hosts.iter().find(|s| s.hostname.eq_ignore_ascii_case(&h)).cloned()
+            self.hosts
+                .iter()
+                .find(|s| s.hostname.eq_ignore_ascii_case(&h))
+                .cloned()
         } else if h.eq_ignore_ascii_case(&self.public_hostname) {
             Some(Site {
                 hostname: self.public_hostname.clone(),
@@ -151,15 +154,25 @@ impl Config {
     fn decode_secret(hexstr: &str) -> Option<Vec<u8>> {
         let h = hexstr.trim();
         let bytes = hex::decode(h).ok()?;
-        if bytes.len() == 16 || bytes.len() == 17 { Some(bytes) } else { None }
+        if bytes.len() == 16 || bytes.len() == 17 {
+            Some(bytes)
+        } else {
+            None
+        }
     }
 
     /// All secrets configured anywhere (legacy union, for bootstrap/global use).
     pub fn all_secret_hexes(&self) -> Vec<String> {
         let mut out = Vec::new();
-        if !self.secret_hex.is_empty() { out.push(self.secret_hex.clone()); }
+        if !self.secret_hex.is_empty() {
+            out.push(self.secret_hex.clone());
+        }
         out.extend(self.secret_hexes.iter().filter(|s| !s.is_empty()).cloned());
-        for b in &self.backends { if !b.secret_hex.is_empty() { out.push(b.secret_hex.clone()); } }
+        for b in &self.backends {
+            if !b.secret_hex.is_empty() {
+                out.push(b.secret_hex.clone());
+            }
+        }
         out
     }
 
@@ -171,7 +184,11 @@ impl Config {
         let secret_hexes = self.site_secret_hexes(host);
         for sec in &secret_hexes {
             if let Some(bytes) = Self::decode_secret(sec) {
-                if crate::bridge::verify_bridge_param(&crate::bridge::Hostname(host.to_string()), &bytes, provided) {
+                if crate::bridge::verify_bridge_param(
+                    &crate::bridge::Hostname(host.to_string()),
+                    &bytes,
+                    provided,
+                ) {
                     // Also resolve which backend addr to use (legacy path or
                     // per-secret backends). Keep it simple: use the global
                     // mtproxy_addr for now; backends may be layered later.
@@ -210,7 +227,12 @@ impl Config {
             if h.is_empty() {
                 continue;
             }
-            let bytes = hex::decode(h).map_err(|e| format!("bad secret '{}': {e}", h.chars().take(8).collect::<String>()))?;
+            let bytes = hex::decode(h).map_err(|e| {
+                format!(
+                    "bad secret '{}': {e}",
+                    h.chars().take(8).collect::<String>()
+                )
+            })?;
             if !(bytes.len() == 16 || bytes.len() == 17) {
                 // skip invalid, don't hard-fail the whole list
                 continue;
@@ -278,18 +300,50 @@ impl Config {
     /// Override config fields from environment variables (deploy-friendly).
     /// Priority: env > config.json > defaults.
     pub fn apply_env(&mut self) {
-        if let Ok(v) = std::env::var("TPROXY_SECRET") { if !v.is_empty() { self.secret_hex = v; } }
-        if let Ok(v) = std::env::var("TPROXY_SECRETS") { if !v.is_empty() { self.secret_hexes = v.split(',').filter(|s| !s.is_empty()).map(|s| String::from(s)).collect::<Vec<String>>(); } }
-        if let Ok(v) = std::env::var("TPROXY_HOSTNAME") { if !v.is_empty() { self.public_hostname = v; } }
-        if let Ok(v) = std::env::var("TPROXY_LISTEN") { if !v.is_empty() { self.listen = v; } }
-        if let Ok(v) = std::env::var("TPROXY_CARRIER") { if !v.is_empty() { self.carrier_mode = v; } }
-        if let Ok(v) = std::env::var("TPROXY_MPROXY") { if !v.is_empty() { self.mtproxy_addr = v; } }
-        if let Ok(v) = std::env::var("TPROXY_SITE_DIR") { if !v.is_empty() { self.public_dir = PathBuf::from(v); } }
+        if let Ok(v) = std::env::var("TPROXY_SECRET") {
+            if !v.is_empty() {
+                self.secret_hex = v;
+            }
+        }
+        if let Ok(v) = std::env::var("TPROXY_SECRETS") {
+            if !v.is_empty() {
+                self.secret_hexes = v
+                    .split(',')
+                    .filter(|s| !s.is_empty())
+                    .map(String::from)
+                    .collect::<Vec<String>>();
+            }
+        }
+        if let Ok(v) = std::env::var("TPROXY_HOSTNAME") {
+            if !v.is_empty() {
+                self.public_hostname = v;
+            }
+        }
+        if let Ok(v) = std::env::var("TPROXY_LISTEN") {
+            if !v.is_empty() {
+                self.listen = v;
+            }
+        }
+        if let Ok(v) = std::env::var("TPROXY_CARRIER") {
+            if !v.is_empty() {
+                self.carrier_mode = v;
+            }
+        }
+        if let Ok(v) = std::env::var("TPROXY_MPROXY") {
+            if !v.is_empty() {
+                self.mtproxy_addr = v;
+            }
+        }
+        if let Ok(v) = std::env::var("TPROXY_SITE_DIR") {
+            if !v.is_empty() {
+                self.public_dir = PathBuf::from(v);
+            }
+        }
     }
 }
 
-
 #[cfg(test)]
+#[allow(clippy::field_reassign_with_default)]
 mod tests {
     use super::*;
 
@@ -313,15 +367,22 @@ mod tests {
         // primary secret -> global backend
         c.secret_hex = "000102030405060708090a0b0c0d0e0f".into();
         c.backends = vec![
-            Backend { secret_hex: "000102030405060708090a0b0c0d0e0f".into(),
-                      mtproxy_addr: "mtproxy-a:2398".into() },
-            Backend { secret_hex: "112233445566778899aabbccddeeff00".into(),
-                      mtproxy_addr: "mtproxy-b:2399".into() },
+            Backend {
+                secret_hex: "000102030405060708090a0b0c0d0e0f".into(),
+                mtproxy_addr: "mtproxy-a:2398".into(),
+            },
+            Backend {
+                secret_hex: "112233445566778899aabbccddeeff00".into(),
+                mtproxy_addr: "mtproxy-b:2399".into(),
+            },
         ];
         let s2 = hex::decode("000102030405060708090a0b0c0d0e0f").unwrap();
         let cap_a = bridge_capability(&host, &s2);
         // capability for secret A -> backend-a
-        assert_eq!(c.capability_backend(&host, &cap_a).unwrap_or_default(), "mtproxy-a:2398");
+        assert_eq!(
+            c.capability_backend(&host, &cap_a).unwrap_or_default(),
+            "mtproxy-a:2398"
+        );
         // unknown secret -> none
         let bad = hex::decode("ffffffffffffffffffffffffffffffff").unwrap();
         let cap_bad = bridge_capability(&host, &bad);
@@ -339,8 +400,16 @@ mod tests {
         let sec_a = "000102030405060708090a0b0c0d0e0f".to_string();
         let sec_b = "112233445566778899aabbccddeeff00".to_string();
         c.hosts = vec![
-            Site { hostname: "site-a.example.com".into(), public_dir: PathBuf::from("sites/a"), secrets: vec![sec_a.clone()] },
-            Site { hostname: "site-b.example.com".into(), public_dir: PathBuf::from("sites/b"), secrets: vec![sec_b.clone()] },
+            Site {
+                hostname: "site-a.example.com".into(),
+                public_dir: PathBuf::from("sites/a"),
+                secrets: vec![sec_a.clone()],
+            },
+            Site {
+                hostname: "site-b.example.com".into(),
+                public_dir: PathBuf::from("sites/b"),
+                secrets: vec![sec_b.clone()],
+            },
         ];
         let ha = crate::bridge::Hostname("site-a.example.com".into());
         let hb = crate::bridge::Hostname("site-b.example.com".into());
@@ -355,9 +424,10 @@ mod tests {
         // B-секрет НЕ проходит на A
         assert!(c.capability_site("site-a.example.com", &cap_b).is_none());
         // resolve_site отдаёт правильную маску
-        assert_eq!(c.resolve_site("site-a.example.com").unwrap().public_dir, PathBuf::from("sites/a"));
+        assert_eq!(
+            c.resolve_site("site-a.example.com").unwrap().public_dir,
+            PathBuf::from("sites/a")
+        );
         assert!(c.resolve_site("unknown.example.com").is_none());
     }
-
-
 }

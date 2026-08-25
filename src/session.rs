@@ -18,7 +18,10 @@ use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 
-use crate::frame::{Frame, TYPE_BYE, TYPE_CLOSE, TYPE_DATA, TYPE_HELLO, TYPE_OPEN, TYPE_PONG, TYPE_WELCOME, TYPE_WINDOW};
+use crate::frame::{
+    Frame, TYPE_BYE, TYPE_CLOSE, TYPE_DATA, TYPE_HELLO, TYPE_OPEN, TYPE_PONG, TYPE_WELCOME,
+    TYPE_WINDOW,
+};
 
 /// A logical stream bound to one backend TCP connection.
 #[allow(dead_code)]
@@ -72,7 +75,12 @@ pub struct Session {
 }
 
 impl Session {
-    pub fn new(id: u64, tx_to_carrier: mpsc::Sender<SessionMsg>, backend: String, limits: SessionLimits) -> Self {
+    pub fn new(
+        id: u64,
+        tx_to_carrier: mpsc::Sender<SessionMsg>,
+        backend: String,
+        limits: SessionLimits,
+    ) -> Self {
         Self {
             id,
             streams: HashMap::new(),
@@ -95,7 +103,10 @@ impl Session {
                 if f.stream_id != 0 {
                     return Err("HELLO with nonzero stream".into());
                 }
-                self.tx_to_carrier.send(SessionMsg::Frame(Frame::new(TYPE_WELCOME, 0, vec![]))).await.map_err(|e| e.to_string())
+                self.tx_to_carrier
+                    .send(SessionMsg::Frame(Frame::new(TYPE_WELCOME, 0, vec![])))
+                    .await
+                    .map_err(|e| e.to_string())
             }
             TYPE_OPEN => {
                 if f.stream_id == 0 {
@@ -104,7 +115,10 @@ impl Session {
                 if self.streams.contains_key(&f.stream_id) {
                     return Err(format!("duplicate OPEN {}", f.stream_id));
                 }
-                eprintln!("[debug] OPEN stream={} backend={}", f.stream_id, self.backend);
+                eprintln!(
+                    "[debug] OPEN stream={} backend={}",
+                    f.stream_id, self.backend
+                );
                 if self.streams.len() >= self.limits.max_streams_per_session {
                     return Err("max streams reached".into());
                 }
@@ -131,7 +145,14 @@ impl Session {
                             }
                             Ok(n) => {
                                 eprintln!("[debug] stream {id} backend read {n}B -> StreamData");
-                                if tx.send(SessionMsg::StreamData { id, data: buf[..n].to_vec() }).await.is_err() {
+                                if tx
+                                    .send(SessionMsg::StreamData {
+                                        id,
+                                        data: buf[..n].to_vec(),
+                                    })
+                                    .await
+                                    .is_err()
+                                {
                                     break;
                                 }
                             }
@@ -144,8 +165,14 @@ impl Session {
                 let Some(tx) = self.streams.get_mut(&f.stream_id) else {
                     return Err(format!("DATA on unknown stream {}", f.stream_id));
                 };
-                eprintln!("[debug] DATA stream={} payload={}B -> backend", f.stream_id, f.payload.len());
-                tx.write_all(&f.payload).await.map_err(|e| format!("backend write: {e}"))?;
+                eprintln!(
+                    "[debug] DATA stream={} payload={}B -> backend",
+                    f.stream_id,
+                    f.payload.len()
+                );
+                tx.write_all(&f.payload)
+                    .await
+                    .map_err(|e| format!("backend write: {e}"))?;
                 Ok(())
             }
             TYPE_WINDOW => Ok(()), // flow control credit, accepted
@@ -161,7 +188,10 @@ impl Session {
     /// Close all streams and emit BYE.
     pub async fn shutdown(&mut self) {
         self.streams.clear();
-        let _ = self.tx_to_carrier.send(SessionMsg::Frame(Frame::new(TYPE_BYE, 0, vec![]))).await;
+        let _ = self
+            .tx_to_carrier
+            .send(SessionMsg::Frame(Frame::new(TYPE_BYE, 0, vec![])))
+            .await;
     }
 }
 

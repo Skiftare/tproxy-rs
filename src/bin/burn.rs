@@ -56,20 +56,28 @@ struct BurnConfig {
 
 #[derive(Deserialize, Debug, Clone)]
 struct TproxySpec {
-    #[serde(default = "d_listen")] listen: String,
-    #[serde(default = "d_carrier")] carrier: String,
-    #[serde(default = "d_mtproxy_container")] mtproxy_container: String,
-    #[serde(default = "d_base_port")] mtproxy_base_port: u16,
-    #[serde(default = "d_public_root")] public_root: String,
+    #[serde(default = "d_listen")]
+    listen: String,
+    #[serde(default = "d_carrier")]
+    carrier: String,
+    #[serde(default = "d_mtproxy_container")]
+    mtproxy_container: String,
+    #[serde(default = "d_base_port")]
+    mtproxy_base_port: u16,
+    #[serde(default = "d_public_root")]
+    public_root: String,
     /// Reserved for future per-site subdomain suffix handling.
     #[serde(default = "d_site_suffix")]
     #[allow(dead_code)]
     site_suffix: String,
     /// Name of the relay container (used in nginx upstream default).
-    #[serde(default = "d_relay_container")] nginx_upstream: String,
+    #[serde(default = "d_relay_container")]
+    nginx_upstream: String,
 }
 
-fn d_relay_container() -> String { "http://relay:8091".into() }
+fn d_relay_container() -> String {
+    "http://relay:8091".into()
+}
 
 #[derive(Deserialize, Debug)]
 struct SiteSpec {
@@ -93,30 +101,54 @@ where
     use serde::de::Error as _;
     let v: serde_yaml::Value = serde_yaml::Value::deserialize(d)?;
     match v {
-        serde_yaml::Value::Number(n) => n.as_u64().map(Keys::Count).ok_or_else(|| D::Error::custom("keys: count must be u64")),
+        serde_yaml::Value::Number(n) => n
+            .as_u64()
+            .map(Keys::Count)
+            .ok_or_else(|| D::Error::custom("keys: count must be u64")),
         serde_yaml::Value::Sequence(seq) => {
             let mut out = Vec::new();
             for item in seq {
-                if let serde_yaml::Value::String(s) = item { out.push(s); }
-                else { return Err(D::Error::custom("keys list items must be strings")); }
+                if let serde_yaml::Value::String(s) = item {
+                    out.push(s);
+                } else {
+                    return Err(D::Error::custom("keys list items must be strings"));
+                }
             }
             Ok(Keys::List(out))
         }
-        _ => Err(D::Error::custom("keys: must be a number or a list of secrets")),
+        _ => Err(D::Error::custom(
+            "keys: must be a number or a list of secrets",
+        )),
     }
 }
 
-fn d_listen() -> String { "127.0.0.1:8091".into() }
-fn d_carrier() -> String { "websocket".into() }
-fn d_mtproxy_container() -> String { "mtproxy-dumb".into() }
-fn d_base_port() -> u16 { 9000 }
-fn d_public_root() -> String { "/srv/burn".into() }
-fn d_site_suffix() -> String { "".into() }
+fn d_listen() -> String {
+    "127.0.0.1:8091".into()
+}
+fn d_carrier() -> String {
+    "websocket".into()
+}
+fn d_mtproxy_container() -> String {
+    "mtproxy-dumb".into()
+}
+fn d_base_port() -> u16 {
+    9000
+}
+fn d_public_root() -> String {
+    "/srv/burn".into()
+}
+fn d_site_suffix() -> String {
+    "".into()
+}
 
 /// Validate that a secret is 16/17-byte hex.
 fn valid_secret(s: &str) -> bool {
-    if !(s.len() == 32 || s.len() == 34) { return false; }
-    hex::decode(s).map(|b| b.len() == 16 || b.len() == 17).unwrap_or(false)
+    if !(s.len() == 32 || s.len() == 34) {
+        return false;
+    }
+    hex::decode(s)
+        .map(|b| b.len() == 16 || b.len() == 17)
+        .unwrap_or(false)
 }
 
 /// Cryptographic random hex secret (16 bytes).
@@ -128,9 +160,16 @@ fn random_secret() -> String {
 
 /// Escape a domain for use as a filename (safe chars, keep it readable).
 fn escape_filename(domain: &str) -> String {
-    domain.chars().map(|c| {
-        if c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '_' { c } else { '_' }
-    }).collect()
+    domain
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect()
 }
 
 /// Materialize all sites: generate secrets where count given.
@@ -141,7 +180,10 @@ struct MaterializedSite {
 }
 
 #[derive(Parser, Debug)]
-#[command(name = "burn", about = "Stamp out a tproxy-rs multi-site fleet from one YAML")]
+#[command(
+    name = "burn",
+    about = "Stamp out a tproxy-rs multi-site fleet from one YAML"
+)]
 struct Cli {
     #[command(subcommand)]
     cmd: Cmd,
@@ -158,9 +200,7 @@ enum Cmd {
         out: PathBuf,
     },
     /// Print what would be generated, without writing anything.
-    Dry {
-        yaml: PathBuf,
-    },
+    Dry { yaml: PathBuf },
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -194,27 +234,41 @@ fn gen(yaml_path: &Path, out: &Path, dry: bool) -> Result<(), Box<dyn std::error
     let mut seen_domains: BTreeMap<String, ()> = BTreeMap::new();
     for s in &cfg.sites {
         let domain = s.domain.trim().to_lowercase();
-        if domain.is_empty() { return Err("burn: empty domain".into()); }
+        if domain.is_empty() {
+            return Err("burn: empty domain".into());
+        }
         if seen_domains.insert(domain.clone(), ()).is_some() {
             return Err(format!("burn: duplicate domain {domain}").into());
         }
         let secrets = match &s.keys {
             Keys::Count(n) => {
-                if *n == 0 { return Err(format!("burn: {domain}: keys: 0 not allowed").into()); }
-                if *n > 10_000 { return Err(format!("burn: {domain}: keys: {n} too large (cap 10k)").into()); }
+                if *n == 0 {
+                    return Err(format!("burn: {domain}: keys: 0 not allowed").into());
+                }
+                if *n > 10_000 {
+                    return Err(format!("burn: {domain}: keys: {n} too large (cap 10k)").into());
+                }
                 (0..*n).map(|_| random_secret()).collect()
             }
             Keys::List(list) => {
-                if list.is_empty() { return Err(format!("burn: {domain}: keys: empty list").into()); }
+                if list.is_empty() {
+                    return Err(format!("burn: {domain}: keys: empty list").into());
+                }
                 for k in list {
-                    if !valid_secret(k) { return Err(format!("burn: {domain}: invalid secret {k}").into()); }
+                    if !valid_secret(k) {
+                        return Err(format!("burn: {domain}: invalid secret {k}").into());
+                    }
                 }
                 list.clone()
             }
         };
         total_keys += secrets.len();
         let secs = secrets.clone();
-        sites.push(MaterializedSite { domain, secrets: secs, port });
+        sites.push(MaterializedSite {
+            domain,
+            secrets: secs,
+            port,
+        });
         port = port.saturating_add(secrets.len() as u16).max(port);
     }
 
@@ -244,11 +298,14 @@ fn gen(yaml_path: &Path, out: &Path, dry: bool) -> Result<(), Box<dyn std::error
     // 3) MTProxy spec: ONE container, per-secret internal ports.
     //    Официальный формат: Erlang sys.config со списком `ports`. Один процесс,
     //    N портов, все в приватной сети (наружу не публикуются).
-    let mut sys_config = String::from("%% -*- mode: erlang -*-\n[\n {mtproto_proxy,\n  [\n   {ports,\n    [\n");
+    let mut sys_config =
+        String::from("%% -*- mode: erlang -*-\n[\n {mtproto_proxy,\n  [\n   {ports,\n    [\n");
     let mut first = true;
     for (_domain, p, secs) in &site_rows {
         for (i, sec) in secs.iter().enumerate() {
-            if !first { sys_config.push_str(",\n"); }
+            if !first {
+                sys_config.push_str(",\n");
+            }
             first = false;
             sys_config.push_str(&format!(
                 "     #{{name => mtp_handler_{}, listen_ip => \"0.0.0.0\", port => {}, secret => <<\"{}\">>, tag => <<\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\">>}}",
@@ -260,7 +317,8 @@ fn gen(yaml_path: &Path, out: &Path, dry: bool) -> Result<(), Box<dyn std::error
     sys_config.push_str(" {kernel,\n  [{logger_level, info},\n   {logger,\n    [{handler, default, logger_std_h,\n      #{level => info,\n        config => #{type => standard_io}}}\n    ]}\n  ]},\n");
     sys_config.push_str(" {sasl,\n  [{errlog_type, error}]}\n].\n");
     // Простой launcher: mtp_proxy foreground -config <path> — читает ports из конфига.
-    let mtproxy_launcher = "#!/bin/sh\nexec /opt/mtp_proxy/bin/mtp_proxy foreground -config /app/mtproxy.sys.config\n";
+    let mtproxy_launcher =
+        "#!/bin/sh\nexec /opt/mtp_proxy/bin/mtp_proxy foreground -config /app/mtproxy.sys.config\n";
 
     // 4) nginx: one server block per site (all → same relay).
     let nginx_upstream = if spec.nginx_upstream.is_empty() {
@@ -288,22 +346,38 @@ fn gen(yaml_path: &Path, out: &Path, dry: bool) -> Result<(), Box<dyn std::error
     }
 
     // 5) Masks (folders) + keys.zip.
-    let masks: BTreeMap<String, String> = site_rows.iter().map(|(domain, _, _)| {
-        (escape_filename(domain), mask_html(domain, spec.carrier.as_str()))
-    }).collect();
+    let masks: BTreeMap<String, String> = site_rows
+        .iter()
+        .map(|(domain, _, _)| {
+            (
+                escape_filename(domain),
+                mask_html(domain, spec.carrier.as_str()),
+            )
+        })
+        .collect();
 
     // 6) keys.zip: N files, one per site, name escaped, M(i) keys each.
     let mut zip_files: Vec<(String, String)> = Vec::new();
     for (domain, _, secs) in &site_rows {
-        zip_files.push((format!("{}.keys.txt", escape_filename(domain)), secs.join("\n")));
+        zip_files.push((
+            format!("{}.keys.txt", escape_filename(domain)),
+            secs.join("\n"),
+        ));
     }
 
     if dry {
-        println!("DRY-RUN burn: {} sites, {} keys total", sites.len(), total_keys);
+        println!(
+            "DRY-RUN burn: {} sites, {} keys total",
+            sites.len(),
+            total_keys
+        );
         for (domain, p, secs) in &site_rows {
             println!("  {domain}: {} keys, mtproxy port {}", secs.len(), p);
         }
-        println!("  mtproxy: ONE container with {} internal ports", total_keys);
+        println!(
+            "  mtproxy: ONE container with {} internal ports",
+            total_keys
+        );
         println!("  zip: {} files", zip_files.len());
         return Ok(());
     }
@@ -312,7 +386,10 @@ fn gen(yaml_path: &Path, out: &Path, dry: bool) -> Result<(), Box<dyn std::error
     let sites_dir = out.join("sites");
     fs::create_dir_all(&sites_dir)?;
 
-    fs::write(out.join("config.json"), serde_json::to_string_pretty(&relay_config)?)?;
+    fs::write(
+        out.join("config.json"),
+        serde_json::to_string_pretty(&relay_config)?,
+    )?;
     fs::write(out.join("mtproxy.sys.config"), sys_config)?;
     fs::write(out.join("mtproxy-launch.sh"), mtproxy_launcher)?;
     fs::write(out.join("nginx-tproxy.conf"), nginx)?;
@@ -328,7 +405,8 @@ fn gen(yaml_path: &Path, out: &Path, dry: bool) -> Result<(), Box<dyn std::error
     {
         let f = fs::File::create(&zip_path)?;
         let mut zw = zip::ZipWriter::new(f);
-        let opts: zip::write::SimpleFileOptions = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+        let opts: zip::write::SimpleFileOptions = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated);
         for (name, content) in &zip_files {
             zw.start_file(name.clone(), opts)?;
             use std::io::Write as _;
@@ -341,8 +419,15 @@ fn gen(yaml_path: &Path, out: &Path, dry: bool) -> Result<(), Box<dyn std::error
     println!("  sites: {}", sites.len());
     println!("  keys total: {total_keys}");
     println!("  relay config: {}", out.join("config.json").display());
-    println!("  mtproxy.sys.config: {} (ONE container, {} ports)", out.join("mtproxy.sys.config").display(), total_keys);
-    println!("  mtproxy-launch.sh: {}", out.join("mtproxy-launch.sh").display());
+    println!(
+        "  mtproxy.sys.config: {} (ONE container, {} ports)",
+        out.join("mtproxy.sys.config").display(),
+        total_keys
+    );
+    println!(
+        "  mtproxy-launch.sh: {}",
+        out.join("mtproxy-launch.sh").display()
+    );
     println!("  masks: {}", sites_dir.display());
     println!("  keys.zip: {}", zip_path.display());
     for (domain, _, secs) in &site_rows {

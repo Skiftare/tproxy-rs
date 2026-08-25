@@ -99,16 +99,25 @@ mod tests {
     fn verify_ok_and_bad() {
         let cap = bridge_capability(&Hostname(HOST.into()), &SECRET);
         assert!(verify_bridge_param(&Hostname(HOST.into()), &SECRET, &cap));
-        assert!(!verify_bridge_param(&Hostname(HOST.into()), &SECRET, &cap[..40]));
-        assert!(!verify_bridge_param(&Hostname(HOST.into()), &SECRET, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"));
-        assert!(!verify_bridge_param(&Hostname(HOST.into()), &SECRET_DD, &cap));
+        assert!(!verify_bridge_param(
+            &Hostname(HOST.into()),
+            &SECRET,
+            &cap[..40]
+        ));
+        assert!(!verify_bridge_param(
+            &Hostname(HOST.into()),
+            &SECRET,
+            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        ));
+        assert!(!verify_bridge_param(
+            &Hostname(HOST.into()),
+            &SECRET_DD,
+            &cap
+        ));
     }
 
     #[test]
     fn len_is_43() {
-        assert_eq!(
-            bridge_capability(&Hostname(HOST.into()), &SECRET).len(),
-            43
-        );
+        assert_eq!(bridge_capability(&Hostname(HOST.into()), &SECRET).len(), 43);
     }
 }

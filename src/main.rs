@@ -51,7 +51,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 
     // Mass-production mode: render per-site configs + secrets from YAML.
-    if let Some(Command::Mass { yaml, out, print_secrets, dry_run }) = cli.command {
+    if let Some(Command::Mass {
+        yaml,
+        out,
+        print_secrets,
+        dry_run,
+    }) = cli.command
+    {
         return run_mass(&yaml, &out, print_secrets, dry_run);
     }
 
@@ -65,7 +71,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         cfg.listen = format!("0.0.0.0:{port}");
     }
     if let Some(h) = cli.hostname {
-        if !h.is_empty() { cfg.public_hostname = h; }
+        if !h.is_empty() {
+            cfg.public_hostname = h;
+        }
     }
     if !cli.secret.is_empty() {
         // CLI secrets go into backends (multi-secret); first also as primary.
@@ -107,7 +115,11 @@ fn run_mass(
     println!(
         "  MASS-PRODUCED WEB PROXIES ({}) {}",
         plan.sites.len(),
-        if dry_run { "[DRY-RUN: nothing written]" } else { "" }
+        if dry_run {
+            "[DRY-RUN: nothing written]"
+        } else {
+            ""
+        }
     );
     println!("  isolation: {}", plan.isolation);
     println!("==========================================================");

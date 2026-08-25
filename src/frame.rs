@@ -33,14 +33,22 @@ impl Frame {
 
     pub fn new(ty: u8, stream_id: u32, payload: Vec<u8>) -> Self {
         debug_assert!(stream_id <= 0xFF_FFFF);
-        Self { ty, stream_id, payload }
+        Self {
+            ty,
+            stream_id,
+            payload,
+        }
     }
 
     /// Serialize to the 8-byte header + payload.
     pub fn encode(&self) -> Vec<u8> {
         let mut out = Vec::with_capacity(Self::HEADER_LEN + self.payload.len());
         out.push(self.ty);
-        out.extend_from_slice(&[(self.stream_id >> 16) as u8, (self.stream_id >> 8) as u8, self.stream_id as u8]);
+        out.extend_from_slice(&[
+            (self.stream_id >> 16) as u8,
+            (self.stream_id >> 8) as u8,
+            self.stream_id as u8,
+        ]);
         let plen = self.payload.len() as u32;
         out.extend_from_slice(&plen.to_be_bytes());
         out.extend_from_slice(&self.payload);
@@ -63,7 +71,11 @@ impl Frame {
             return Ok(None);
         }
         let payload = buf[Self::HEADER_LEN..Self::HEADER_LEN + plen].to_vec();
-        let frame = Frame { ty, stream_id, payload };
+        let frame = Frame {
+            ty,
+            stream_id,
+            payload,
+        };
         Ok(Some((frame, Self::HEADER_LEN + plen)))
     }
 
@@ -136,7 +148,10 @@ mod tests {
     fn oversized_rejected() {
         let mut buf = vec![TYPE_DATA, 0, 0, 1];
         buf.extend_from_slice(&(MAX_FRAME_PAYLOAD as u32 + 1).to_be_bytes());
-        assert_eq!(Frame::decode(&buf), Err(FrameError::Oversized(MAX_FRAME_PAYLOAD + 1)));
+        assert_eq!(
+            Frame::decode(&buf),
+            Err(FrameError::Oversized(MAX_FRAME_PAYLOAD + 1))
+        );
     }
 
     #[test]

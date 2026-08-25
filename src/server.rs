@@ -12,16 +12,16 @@ use axum::body::Bytes;
 use axum::extract::{Query, State};
 use axum::http::{header, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get, post, delete};
+use axum::routing::{delete, get, post};
 use axum::Router;
-use serde::Deserialize;
 use futures_util::{SinkExt, StreamExt};
+use serde::Deserialize;
 use tokio::sync::{broadcast, mpsc, Mutex};
 
-use sha2::{Digest, Sha256};
 use crate::config::Config;
 use crate::frame::{self, Frame, TYPE_CLOSE, TYPE_DATA, TYPE_HELLO, TYPE_WELCOME};
 use crate::session::{run_session_loop, SessionLimits, SessionMsg};
+use sha2::{Digest, Sha256};
 
 // ---- shared session state ----
 #[derive(Clone)]
@@ -65,12 +65,12 @@ struct RootQuery {
 #[allow(dead_code)]
 struct SessionReq {}
 
-
-/// Bootstrap capability = bridge capability for this host+secret (simplified).
-
-
+// Bootstrap capability = bridge capability for this host+secret (simplified).
 // DELETE /api/v1/session: close/abandon a session (client teardown).
-async fn api_session_delete(State(st): State<AppState>, headers: axum::http::HeaderMap) -> Response {
+async fn api_session_delete(
+    State(st): State<AppState>,
+    headers: axum::http::HeaderMap,
+) -> Response {
     let bearer = match headers.get("authorization").and_then(|h| h.to_str().ok()) {
         Some(a) if a.starts_with("Bearer ") => a[7..].to_string(),
         _ => return (StatusCode::UNAUTHORIZED, "no bearer").into_response(),
@@ -82,7 +82,11 @@ async fn api_session_delete(State(st): State<AppState>, headers: axum::http::Hea
     (StatusCode::NO_CONTENT).into_response()
 }
 
-async fn api_session(State(st): State<AppState>, headers: axum::http::HeaderMap, body: Bytes) -> Response {
+async fn api_session(
+    State(st): State<AppState>,
+    headers: axum::http::HeaderMap,
+    body: Bytes,
+) -> Response {
     // Bootstrap capability passed as Authorization: Bearer <bootstrap>.
     let bearer = match headers.get("authorization").and_then(|h| h.to_str().ok()) {
         Some(a) if a.starts_with("Bearer ") => a[7..].to_string(),
@@ -93,10 +97,16 @@ async fn api_session(State(st): State<AppState>, headers: axum::http::HeaderMap,
         bs.remove(&bearer)
     };
     if bootstrap_addr.is_none() {
-        println!("[ws] session REJECTED bearer={}...", &bearer[..bearer.len().min(8)]);
+        println!(
+            "[ws] session REJECTED bearer={}...",
+            &bearer[..bearer.len().min(8)]
+        );
         return (StatusCode::UNAUTHORIZED, "bad bootstrap").into_response();
     }
-    println!("[ws] session accepted bearer={}...", &bearer[..bearer.len().min(8)]);
+    println!(
+        "[ws] session accepted bearer={}...",
+        &bearer[..bearer.len().min(8)]
+    );
     // Body must be exactly one HELLO frame.
     let frames = match frame::decode_batch(&body) {
         Ok(f) => f,
@@ -110,14 +120,23 @@ async fn api_session(State(st): State<AppState>, headers: axum::http::HeaderMap,
     let (host, capability) = match bootstrap_addr.as_deref() {
         Some(v) if v.contains('|') => {
             let mut it = v.splitn(2, '|');
-            (it.next().unwrap_or("").to_string(), it.next().unwrap_or("").to_string())
+            (
+                it.next().unwrap_or("").to_string(),
+                it.next().unwrap_or("").to_string(),
+            )
         }
         _ => (String::new(), String::new()),
     };
     let backend = if !host.is_empty() && !capability.is_empty() {
         // The capability was already validated in `root`; find the site's
         // backend (global mtproxy by default; can be refined per-site later).
-        st.cfg.backend_for_secret(&st.cfg.site_secret_hexes(&host).first().cloned().unwrap_or_default())
+        st.cfg.backend_for_secret(
+            &st.cfg
+                .site_secret_hexes(&host)
+                .first()
+                .cloned()
+                .unwrap_or_default(),
+        )
     } else {
         st.cfg.mtproxy_addr.clone()
     };
@@ -130,7 +149,10 @@ async fn api_session(State(st): State<AppState>, headers: axum::http::HeaderMap,
     // Spawn the session loop (frame-driven). The session's outbound (SessionMsg)
     // is forwarded into the broadcast for /down (https) or ws writer.
     let limits = SessionLimits::default();
-    st.session_backends.lock().await.insert(bearer.clone(), backend.clone());
+    st.session_backends
+        .lock()
+        .await
+        .insert(bearer.clone(), backend.clone());
     let (frame_tx, frame_rx) = mpsc::channel::<Frame>(256);
     let b2 = backend.clone();
     let out_tx2 = out_tx.clone();
@@ -151,17 +173,29 @@ async fn api_session(State(st): State<AppState>, headers: axum::http::HeaderMap,
 
     let mut resp = Response::new("".into());
     *resp.status_mut() = StatusCode::OK;
-    resp.headers_mut().insert("X-Session-Token", HeaderValue::from_str(&bearer).unwrap());
-    resp.headers_mut().insert("X-Down-Cursor", HeaderValue::from_static("0"));
-    resp.headers_mut().insert("X-Carrier-Mode", HeaderValue::from_str(&st.cfg.carrier_mode).unwrap());
-    resp.headers_mut().insert(header::CONTENT_TYPE, "application/octet-stream".parse().unwrap());
+    resp.headers_mut()
+        .insert("X-Session-Token", HeaderValue::from_str(&bearer).unwrap());
+    resp.headers_mut()
+        .insert("X-Down-Cursor", HeaderValue::from_static("0"));
+    resp.headers_mut().insert(
+        "X-Carrier-Mode",
+        HeaderValue::from_str(&st.cfg.carrier_mode).unwrap(),
+    );
+    resp.headers_mut().insert(
+        header::CONTENT_TYPE,
+        "application/octet-stream".parse().unwrap(),
+    );
     // WELCOME frame in body
     *resp.body_mut() = axum::body::Body::from(Frame::new(TYPE_WELCOME, 0, vec![]).encode());
     resp
 }
 
 // ---- uplink: POST /up with frames, returns 204 ----
-async fn api_up(State(st): State<AppState>, headers: axum::http::HeaderMap, body: Bytes) -> Response {
+async fn api_up(
+    State(st): State<AppState>,
+    headers: axum::http::HeaderMap,
+    body: Bytes,
+) -> Response {
     println!("[up] POST /api/v1/up body={}B", body.len());
     let bearer = match headers.get("authorization").and_then(|h| h.to_str().ok()) {
         Some(a) if a.starts_with("Bearer ") => a[7..].to_string(),
@@ -180,10 +214,15 @@ async fn api_up(State(st): State<AppState>, headers: axum::http::HeaderMap, body
             return (StatusCode::UNAUTHORIZED, "session closed").into_response();
         }
     }
-    let seq = headers.get("x-up-seq").and_then(|h| h.to_str().ok()).unwrap_or("").to_string();
+    let seq = headers
+        .get("x-up-seq")
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or("")
+        .to_string();
     let mut resp = Response::new(axum::body::Body::empty());
     *resp.status_mut() = StatusCode::NO_CONTENT;
-    resp.headers_mut().insert("X-Up-Ack", HeaderValue::from_str(&seq).unwrap());
+    resp.headers_mut()
+        .insert("X-Up-Ack", HeaderValue::from_str(&seq).unwrap());
     resp
 }
 
@@ -206,10 +245,12 @@ async fn api_down(State(st): State<AppState>, headers: axum::http::HeaderMap) ->
             Ok(Ok(m)) => {
                 match m {
                     SessionMsg::Frame(f) => payload.extend_from_slice(&f.encode()),
-                    SessionMsg::StreamData { id, data } => payload.extend_from_slice(
-                        &Frame::new(TYPE_DATA, id, data).encode()),
-                    SessionMsg::StreamClose { id } => payload.extend_from_slice(
-                        &Frame::new(TYPE_CLOSE, id, vec![]).encode()),
+                    SessionMsg::StreamData { id, data } => {
+                        payload.extend_from_slice(&Frame::new(TYPE_DATA, id, data).encode())
+                    }
+                    SessionMsg::StreamClose { id } => {
+                        payload.extend_from_slice(&Frame::new(TYPE_CLOSE, id, vec![]).encode())
+                    }
                 }
                 got = true;
             }
@@ -219,15 +260,15 @@ async fn api_down(State(st): State<AppState>, headers: axum::http::HeaderMap) ->
     if !got {
         // long-poll wait for the first frame (up to 25s)
         match tokio::time::timeout(std::time::Duration::from_secs(25), rx.recv()).await {
-            Ok(Ok(m)) => {
-                match m {
-                    SessionMsg::Frame(f) => payload.extend_from_slice(&f.encode()),
-                    SessionMsg::StreamData { id, data } => payload.extend_from_slice(
-                        &Frame::new(TYPE_DATA, id, data).encode()),
-                    SessionMsg::StreamClose { id } => payload.extend_from_slice(
-                        &Frame::new(TYPE_CLOSE, id, vec![]).encode()),
+            Ok(Ok(m)) => match m {
+                SessionMsg::Frame(f) => payload.extend_from_slice(&f.encode()),
+                SessionMsg::StreamData { id, data } => {
+                    payload.extend_from_slice(&Frame::new(TYPE_DATA, id, data).encode())
                 }
-            }
+                SessionMsg::StreamClose { id } => {
+                    payload.extend_from_slice(&Frame::new(TYPE_CLOSE, id, vec![]).encode())
+                }
+            },
             _ => return (StatusCode::NO_CONTENT).into_response(),
         }
     }
@@ -239,8 +280,14 @@ async fn api_down(State(st): State<AppState>, headers: axum::http::HeaderMap) ->
     };
     let mut resp = Response::new(axum::body::Body::from(payload));
     *resp.status_mut() = StatusCode::OK;
-    resp.headers_mut().insert("X-Down-Cursor", HeaderValue::from_str(&cursor.to_string()).unwrap());
-    resp.headers_mut().insert(header::CONTENT_TYPE, "application/octet-stream".parse().unwrap());
+    resp.headers_mut().insert(
+        "X-Down-Cursor",
+        HeaderValue::from_str(&cursor.to_string()).unwrap(),
+    );
+    resp.headers_mut().insert(
+        header::CONTENT_TYPE,
+        "application/octet-stream".parse().unwrap(),
+    );
     resp
 }
 
@@ -260,15 +307,18 @@ async fn ws_carrier(
     match proto {
         Some(p) => {
             // Extract the session bearer from "tproxy-v1.<token>" subprotocol.
-            let token = p.split('.').skip(1).next().unwrap_or("").to_string();
+            let token = p.split('.').nth(1).unwrap_or("").to_string();
             let backend = {
                 let sb = st.session_backends.lock().await;
-                sb.get(&token).cloned().unwrap_or(st.cfg.mtproxy_addr.clone())
+                sb.get(&token)
+                    .cloned()
+                    .unwrap_or(st.cfg.mtproxy_addr.clone())
             };
             // axum 0.7 websocket protocols need 'static str; proxy context lives
             // as long as the process, so leaking the subprotocol string is fine.
             let leaked: &'static str = Box::leak(p.clone().into_boxed_str());
-            ws.protocols([leaked]).on_upgrade(move |socket| handle_ws(socket, st, backend))
+            ws.protocols([leaked])
+                .on_upgrade(move |socket| handle_ws(socket, st, backend))
         }
         None => {
             let backend = st.cfg.mtproxy_addr.clone();
@@ -292,10 +342,12 @@ async fn handle_ws(socket: axum::extract::ws::WebSocket, st: AppState, backend: 
         while let Some(m) = session_rx.recv().await {
             let msg = match m {
                 SessionMsg::Frame(f) => Message::Binary(f.encode()),
-                SessionMsg::StreamData { id, data } => Message::Binary(
-                    Frame::new(TYPE_DATA, id, data).encode(),
-                ),
-                SessionMsg::StreamClose { id } => Message::Binary(Frame::new(TYPE_CLOSE, id, vec![]).encode()),
+                SessionMsg::StreamData { id, data } => {
+                    Message::Binary(Frame::new(TYPE_DATA, id, data).encode())
+                }
+                SessionMsg::StreamClose { id } => {
+                    Message::Binary(Frame::new(TYPE_CLOSE, id, vec![]).encode())
+                }
             };
             if tx.send(msg).await.is_err() {
                 break;
@@ -314,7 +366,13 @@ async fn handle_ws(socket: axum::extract::ws::WebSocket, st: AppState, backend: 
         match msg {
             Message::Binary(data) => {
                 if let Ok(frames) = frame::decode_batch(&data) {
-                    println!("[ws] frames: {:?}", frames.iter().map(|x| (x.ty, x.stream_id)).collect::<Vec<_>>());
+                    println!(
+                        "[ws] frames: {:?}",
+                        frames
+                            .iter()
+                            .map(|x| (x.ty, x.stream_id))
+                            .collect::<Vec<_>>()
+                    );
                     for f in frames {
                         let _ = frame_tx.send(f).await;
                     }
@@ -331,12 +389,23 @@ async fn handle_ws(socket: axum::extract::ws::WebSocket, st: AppState, backend: 
 }
 
 // ---- static file serving (site-scoped by Host header) ----
-async fn serve_static(State(st): State<AppState>, uri: axum::http::Uri, headers: axum::http::HeaderMap) -> Response {
+async fn serve_static(
+    State(st): State<AppState>,
+    uri: axum::http::Uri,
+    headers: axum::http::HeaderMap,
+) -> Response {
     let host = host_from_headers(&headers);
-    let root = st.cfg.resolve_site(&host).map(|s| s.public_dir.clone())
+    let root = st
+        .cfg
+        .resolve_site(&host)
+        .map(|s| s.public_dir.clone())
         .unwrap_or_else(|| st.cfg.public_dir.clone());
     let path = uri.path();
-    let rel = if path == "/" { "index.html" } else { path.trim_start_matches('/') };
+    let rel = if path == "/" {
+        "index.html"
+    } else {
+        path.trim_start_matches('/')
+    };
     let fpath = root.join(rel);
     if fpath.is_file() {
         if let Ok(bytes) = tokio::fs::read(&fpath).await {
@@ -349,7 +418,8 @@ async fn serve_static(State(st): State<AppState>, uri: axum::http::Uri, headers:
 
 /// Extract the Host header (lowercased, no port).
 fn host_from_headers(headers: &axum::http::HeaderMap) -> String {
-    headers.get(header::HOST)
+    headers
+        .get(header::HOST)
         .and_then(|h| h.to_str().ok())
         .map(|h| h.split(':').next().unwrap_or(h).to_lowercase())
         .unwrap_or_default()
@@ -382,34 +452,56 @@ pub fn router(st: AppState) -> Router {
 }
 
 // Root route: serve static or bridge page based on ?bridge param.
-async fn root(State(st): State<AppState>, Query(q): Query<RootQuery>, headers: axum::http::HeaderMap) -> Response {
+async fn root(
+    State(st): State<AppState>,
+    Query(q): Query<RootQuery>,
+    headers: axum::http::HeaderMap,
+) -> Response {
     let host = host_from_headers(&headers);
-    println!("[http] GET / host={} bridge={}", host, q.bridge.as_deref().unwrap_or("").chars().take(8).collect::<String>());
+    println!(
+        "[http] GET / host={} bridge={}",
+        host,
+        q.bridge
+            .as_deref()
+            .unwrap_or("")
+            .chars()
+            .take(8)
+            .collect::<String>()
+    );
     if let Some(b) = &q.bridge {
         // Site-scoped capability check: a secret minted for ANOTHER host
         // produces a capability that fails here (HMAC includes the hostname).
         if let Some((_site, _secret)) = st.cfg.capability_site(&host, b) {
-            let page = bridge_page(&st, &host, &b);
+            let page = bridge_page(&st, &host, b);
             return ([(header::CONTENT_TYPE, "text/html; charset=utf-8")], page).into_response();
         }
         // Fallthrough: unknown capability -> serve the site mask (looks like a
         // normal homepage; no leak that this is a proxy endpoint).
     }
-    serve_static(State(st.clone()), axum::http::Uri::from_static("/"), headers).await
+    serve_static(
+        State(st.clone()),
+        axum::http::Uri::from_static("/"),
+        headers,
+    )
+    .await
 }
 
-
-
-
 fn bridge_page(st: &AppState, host: &str, capability: &str) -> String {
-    let ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0);
-    let bcounter = st.next_id.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let bcounter = st
+        .next_id
+        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let soup = format!("{}-{}", ms, bcounter);
     let nonce = hex::encode(Sha256::digest(format!("n{}", soup).as_bytes()));
     let bootstrap = hex::encode(Sha256::digest(format!("b{}", soup).as_bytes()));
     {
         let mut bs = st.bootstraps.lock().unwrap();
-        if bs.len() > 8192 { bs.clear(); }
+        if bs.len() > 8192 {
+            bs.clear();
+        }
         // Bootstrap maps to site|capability; session resolves it back.
         bs.insert(bootstrap.clone(), format!("{}|{}", host, capability));
     }
