@@ -1,5 +1,19 @@
+# Rust
 target/
+target2/
 Cargo.lock
+
+# Секреты и конфиги с реальными ключами — НИКОГДА не пушить
 config.json
+config-*.json
+configs-svalka/
+burn-svalka.yaml
+burn-out/
 deploy/.env
 deploy/config.json
+keys*.zip
+*.sys.config
+
+# Локальное
+*.log
+erl_crash.dump

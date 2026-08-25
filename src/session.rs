@@ -103,11 +103,16 @@ impl Session {
                 if self.streams.contains_key(&f.stream_id) {
                     return Err(format!("duplicate OPEN {}", f.stream_id));
                 }
+                eprintln!("[debug] OPEN stream={} backend={}", f.stream_id, self.backend);
                 if self.streams.len() >= self.limits.max_streams_per_session {
                     return Err("max streams reached".into());
                 }
                 // Open backend TCP to MTProxy.
-                let conn = TcpStream::connect(&self.backend).await.map_err(|e| format!("backend connect: {e}"))?;
+                let conn = TcpStream::connect(&self.backend).await.map_err(|e| {
+                    eprintln!("[debug] OPEN connect FAIL: {e}");
+                    format!("backend connect: {e}")
+                })?;
+                eprintln!("[debug] OPEN connected to {}", self.backend);
                 let (rx, tx) = conn.into_split();
                 self.streams.insert(f.stream_id, tx);
                 let id = f.stream_id;
@@ -119,10 +124,12 @@ impl Session {
                     loop {
                         match rx.read(&mut buf).await {
                             Ok(0) | Err(_) => {
+                                eprintln!("[debug] stream {id} backend EOF/err -> StreamClose");
                                 let _ = tx.send(SessionMsg::StreamClose { id }).await;
                                 break;
                             }
                             Ok(n) => {
+                                eprintln!("[debug] stream {id} backend read {n}B -> StreamData");
                                 if tx.send(SessionMsg::StreamData { id, data: buf[..n].to_vec() }).await.is_err() {
                                     break;
                                 }
@@ -133,12 +140,10 @@ impl Session {
                 Ok(())
             }
             TYPE_DATA => {
-                if f.stream_id == 0 {
-                    return Err("DATA on stream 0".into());
-                }
                 let Some(tx) = self.streams.get_mut(&f.stream_id) else {
                     return Err(format!("DATA on unknown stream {}", f.stream_id));
                 };
+                eprintln!("[debug] DATA stream={} payload={}B -> backend", f.stream_id, f.payload.len());
                 tx.write_all(&f.payload).await.map_err(|e| format!("backend write: {e}"))?;
                 Ok(())
             }

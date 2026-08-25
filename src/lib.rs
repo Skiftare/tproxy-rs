@@ -8,6 +8,7 @@
 pub mod bridge;
 pub mod config;
 pub mod frame;
+pub mod mass;
 pub mod relay;
 pub mod server;
 pub mod session;
